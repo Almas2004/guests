@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Guest Check-In</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.17.3/xlsx.full.min.js"></script>
+    <script>
+        // Функция для чтения и обработки Excel-файла
+        async function readExcelFile(file) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const data = new Uint8Array(e.target.result);
+                const workbook = XLSX.read(data, { type: 'array' });
+                const sheetName = workbook.SheetNames[0]; // Используем первый лист
+                const sheet = workbook.Sheets[sheetName];
+                const json = XLSX.utils.sheet_to_json(sheet);
+                
+                const urlParams = new URLSearchParams(window.location.search);
+                const guestID = urlParams.get('guestID');
+                
+                if (guestID) {
+                    const guest = json.find(row => row.ID == guestID);
+                    if (guest) {
+                        document.getElementById('guest-info').innerText = 'Имя: ' + guest.Имя + ', Фамилия: ' + guest.Фамилия;
+                    } else {
+                        document.getElementById('guest-info').innerText = 'Гость не найден.';
+                    }
+                } else {
+                    document.getElementById('guest-info').innerText = 'ID гостя не указан.';
+                }
+            };
+            reader.readAsArrayBuffer(file);
+        }
+
+        // Обработка события загрузки файла
+        function handleFileUpload(event) {
+            const file = event.target.files[0];
+            if (file) {
+                readExcelFile(file);
+            }
+        }
+    </script>
+</head>
+<body>
+    <h1>Проверка гостя</h1>
+    <input type="file" id="file-upload" />
+    <p id="guest-info">Загрузка...</p>
+    <script>
+        document.getElementById('file-upload').addEventListener('change', handleFileUpload);
+    </script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.17.3/xlsx.full.min.js"></script>
+</body>
+</html>
