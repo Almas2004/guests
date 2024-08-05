@@ -6,49 +6,70 @@
     <title>Guest Check-In</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.17.3/xlsx.full.min.js"></script>
     <script>
-        // Функция для чтения и обработки Excel-файла
-        async function readExcelFile(file) {
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                const data = new Uint8Array(e.target.result);
-                const workbook = XLSX.read(data, { type: 'array' });
-                const sheetName = workbook.SheetNames[0]; // Используем первый лист
-                const sheet = workbook.Sheets[sheetName];
-                const json = XLSX.utils.sheet_to_json(sheet);
-                
-                const urlParams = new URLSearchParams(window.location.search);
-                const guestID = urlParams.get('guestID');
-                
-                if (guestID) {
-                    const guest = json.find(row => row.ID == guestID);
-                    if (guest) {
-                        document.getElementById('guest-info').innerText = 'Имя: ' + guest.Имя + ', Фамилия: ' + guest.Фамилия;
-                    } else {
-                        document.getElementById('guest-info').innerText = 'Гость не найден.';
-                    }
-                } else {
-                    document.getElementById('guest-info').innerText = 'ID гостя не указан.';
-                }
-            };
-            reader.readAsArrayBuffer(file);
-        }
+        let guestData = null;
 
-        // Обработка события загрузки файла
-        function handleFileUpload(event) {
-            const file = event.target.files[0];
-            if (file) {
-                readExcelFile(file);
+        async function readExcelFile() {
+            const fileUrl = 'Список.xlsx'; // Убедитесь, что путь к файлу правильный
+            const response = await fetch(fileUrl);
+            const arrayBuffer = await response.arrayBuffer();
+            const data = new Uint8Array(arrayBuffer);
+            const workbook = XLSX.read(data, { type: 'array' });
+            const sheetName = workbook.SheetNames[0]; // Используем первый лист
+            const sheet = workbook.Sheets[sheetName];
+            guestData = XLSX.utils.sheet_to_json(sheet);
+            
+            const urlParams = new URLSearchParams(window.location.search);
+            const guestID = urlParams.get('guestID');
+            
+            if (guestID) {
+                const guest = guestData.find(row => row.ID == guestID);
+                if (guest) {
+                    document.getElementById('guest-info').innerText = 'Имя: ' + guest.Имя + ', Фамилия: ' + guest.Фамилия;
+                    document.getElementById('guestID').value = guestID;
+                } else {
+                    document.getElementById('guest-info').innerText = 'Гость не найден.';
+                }
+            } else {
+                document.getElementById('guest-info').innerText = 'ID гостя не указан.';
             }
         }
+
+        async function markAsCheckedIn() {
+            const guestID = document.getElementById('guestID').value;
+            if (guestData && guestID) {
+                const guest = guestData.find(row => row.ID == guestID);
+                if (guest) {
+                    // Отправка данных в Google Sheets
+                    try {
+                        const response = await fetch('https://script.google.com/macros/s/AKfycbxkO2vwAF8yk-r6ruWw-oq4YglzDYDr41BODuXB0dd2xbQuWyDMwz3fKGXF_U8DTI5y/exec', { // Замените на URL вашего веб-приложения
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({ ID: guestID, Имя: guest.Имя, Фамилия: guest.Фамилия }),
+                        });
+
+                        if (response.ok) {
+                            document.getElementById('report').innerText = 'Прибытие отмечено.';
+                        } else {
+                            document.getElementById('report').innerText = 'Ошибка при отметке прибытия.';
+                        }
+                    } catch (error) {
+                        console.error('Ошибка при отправке данных:', error);
+                        document.getElementById('report').innerText = 'Ошибка при отправке данных.';
+                    }
+                }
+            }
+        }
+
+        window.onload = readExcelFile;
     </script>
 </head>
 <body>
     <h1>Проверка гостя</h1>
-    <input type="file" id="file-upload" />
     <p id="guest-info">Загрузка...</p>
-    <script>
-        document.getElementById('file-upload').addEventListener('change', handleFileUpload);
-    </script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.17.3/xlsx.full.min.js"></script>
+    <input type="hidden" id="guestID">
+    <button onclick="markAsCheckedIn()">Прибыл</button>
+    <p id="report"></p>
 </body>
 </html>
